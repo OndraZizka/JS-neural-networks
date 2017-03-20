@@ -1,0 +1,159 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN"><html><head>
+	<meta http-equiv="Content-Type" content="text/html; charset=windows-1250"/>
+	<meta name="Author" content="Ondra Žižka; ondra at dynawest.cz"/>
+	<meta name="Keywords" lang="en" content="Neural network, JavaScript, BackPropagation, Artifical neuron, Artifical inteligence"/>
+	<meta name="Keywords" lang="cs" content="neuronová síť, javascript, backpropagation, umělý neuron, umělá inteligence"/>
+	<meta name="Description" content="Implementace neuronové sítě s učítelem (metodou backpropagation) v JavaScriptu (těžce objektově)"/>
+	<style type="text/css">
+		body { background-color: #ffffff; }
+		textarea#serialization {
+			font-size: 9px; font-family: "Verdana", "Courier New CE", "Courier New", Courier, sans-serif;
+			width: 100%;
+		}
+	</style>
+	<script type="text/javascript"  charset="windows-1250" src="fce.js"></script>
+	<script type="text/javascript"  charset="windows-1250" src="lib.cSet.js"></script>
+	<script type="text/javascript"  charset="windows-1250" src="lib.cAverage.js"></script>
+	<script type="text/javascript"  charset="windows-1250" src="lib.DebugWindow.js"></script>
+	<script type="text/javascript"  charset="windows-1250" src="lib.cNeuralNet.js"></script>
+	<script type="text/javascript"  charset="windows-1250" src="lib.cNeuralNetPerceptron.js"></script>
+	<script type="text/javascript"  charset="windows-1250" src="lib.cNeuralNetTeacher.js"></script>
+<script type="text/javascript">
+
+
+/**************************************************************
+  OnLoad - vse se provede az po nacteni stranky                
+**************************************************************/
+function OnLoad(e){
+	if(bMSIE) e = window.event;
+	var _dw = null;
+	_dw = window._dw = new DebugWindow(); _dw.Open(); _dw.Clear(); _dw.Write("Debug window opened."); ///
+	
+	
+	
+	
+	// Binarni relace 
+	// AND, OR, XOR, NOT A 
+	var oTrainSet = new cNeuralTrainSet();
+	var adI;
+	adI = [0,0];  // A, B 
+	oTrainSet.Add( new cNeuralTrainSetItem( adI, [ adI[0] && adI[1], adI[0] || adI[1], adI[0] ^ adI[1], 0+!adI[0] ] ) );
+	adI = [0,1];  // A, B 
+	oTrainSet.Add( new cNeuralTrainSetItem( adI, [ adI[0] && adI[1], adI[0] || adI[1], adI[0] ^ adI[1], 0+!adI[0] ] ) );
+	adI = [1,0];  // A, B 
+	oTrainSet.Add( new cNeuralTrainSetItem( adI, [ adI[0] && adI[1], adI[0] || adI[1], adI[0] ^ adI[1], 0+!adI[0] ] ) );
+	adI = [1,1];  // A, B 
+	oTrainSet.Add( new cNeuralTrainSetItem( adI, [ adI[0] && adI[1], adI[0] || adI[1], adI[0] ^ adI[1], 0+!adI[0] ] ) );
+
+
+	//debugger;
+	//var oNet        = new cNeuralNetPerceptron([2,6,4]);
+	var oNet        = window.oNet        = new cNeuralNetPerceptron([2,4,4]);
+	var oNetAdapter = window.oNetAdapter = new cNeuralNetIOAdapter(oNet);
+	// cNeuralNetTeacher(oNeuralNetIOAdapter, oTrainSet, dLearn, dMomentum, dTargetError, iMaxRepeats){
+	var oNetTeacher = window.oNetTeacher = new cNeuralNetTeacher(oNetAdapter, oTrainSet, 0.5, 0.05, 0.01, 1000);
+	if(_dw) _dw.Write("--- oNet, oNetAdapter & oNetTeacher created. ---"); ///
+	if(_dw) _dw.oNetTeacher = oNetTeacher;
+	
+	// Pořadí výpočtu neuronů 
+	oNet.FindComputingOrder();
+	if(_dw){   ///
+		_dw.Write("Výstupní vrstva: " + oNet.aoOutputNeurons);
+		cNeuron.prototype.toString = cNeuron.prototype.toStringAtom;
+		_dw.Write("Pořadí výpočtu neuronů: " + oNet.aoNeuronsOrder);
+		cNeuron.prototype.toString = cNeuron.prototype.toStringShort;
+	}
+	
+	
+	//window.setTimeout(NeuralNetStep, 100);
+	if(_dw) _dw.Finish();
+}
+window.onload = OnLoad;
+
+
+function NeuralNetStep(){
+	if(_dw){
+		//if(! (window.oNetTeacher.GetCorrectionsCount() % 1) )
+			_dw.Clear(); ///
+		if(_dw) _dw.Write("--- oNetTeacher.Turn(); ---"); ///
+		window.oNetTeacher.Turn();
+		if(_dw) _dw.Write("--- oNetTeacher.PerformCorrection(); ---"); ///
+		window.oNetTeacher.PerformCorrection();
+	}else{
+		for( var i = 0; i < 100; i++ ){
+			window.oNetTeacher.Turn();
+			window.oNetTeacher.PerformCorrection();
+		}
+	}
+	SyncInfo();
+	
+	//if(window.oNetTeacher.GetCorrectionsCount() < 100000)
+		window.oTeacherTurnTimeout = window.setTimeout(NeuralNetStep, 0);
+}
+
+function SyncInfo(){
+	document.getElementById("step").innerHTML =      window.oNetTeacher.GetCorrectionsCount();
+	document.getElementById("error_sum").innerHTML = Round(window.oNetTeacher.GetErrorSum(), 3);
+	document.getElementById("error_percent").innerHTML = Round(window.oNetTeacher.GetErrorSum() / 4,  5);
+	document.getElementById("error_avg").innerHTML = Round(window.oNetTeacher.GetErrorSumsAvg() / 4, 5);
+	document.getElementById("error_avg100-0").innerHTML = Round(window.oNetTeacher.GetErrorSumsAvg(100) / 4, 5);
+	document.getElementById("error_avg60-100").innerHTML = Round(window.oNetTeacher.GetErrorSumsAvg(60,100) / 4, 5);
+	document.getElementById("error_avg60-2000").innerHTML = Round(window.oNetTeacher.GetErrorSumsAvg(60,2000) / 4, 5);
+	document.getElementById("error_avg100-15000").innerHTML = Round(window.oNetTeacher.GetErrorSumsAvg(100,15000) / 4, 5);
+	window.title = "NeuralNet in JavaScript - step " + window.oNetTeacher.GetCorrectionsCount();
+}
+
+
+
+function StartStop(){
+	  window.oTeacherTurnTimeout
+	?	(window.clearTimeout(window.oTeacherTurnTimeout)
+	, window.oTeacherTurnTimeout = null)
+	:	(window.oTeacherTurnTimeout = window.setTimeout(NeuralNetStep, 10))
+	;
+}
+function SerializeNet(){
+	var oTextarea = document.getElementById("serialization");
+	if(!oTextarea) return false;
+	oTextarea.value = window.oNet.Serialize();
+	return true;
+}
+function UnserializeNet(){
+	var oTextarea = document.getElementById("serialization");
+	if(!oTextarea) return false;
+	return window.oNet.Unserialize(oTextarea.value);
+}
+function ToggleDebug(e){
+	if(window._dw){
+		window._dw_backup = window._dw;
+		window._dw = null;
+	}
+	else{
+		window._dw = window._dw_backup;
+	}	
+}
+
+
+</script>
+<title> Neural Net in JavaScript </title></head>
+<body>
+
+<table>
+<tr><td>Step:</td> <td><span id="step">0</span></td></tr>
+<tr><td>Error Sum:</td> <td><span id="error_sum"></span></td></tr>
+<tr><td>Error %:</td> <td><span id="error_percent"></span></td></tr>
+<tr><td>Error Sum avg, native:</td> <td><span id="error_avg"></span></td></tr>
+<tr><td>Error Sum avg, last 100 turns:</td> <td><span id="error_avg100-0"></span></td></tr>
+<tr><td>Error Sum avg, 60t 100t ago:</td> <td><span id="error_avg60-100"></span></td></tr>
+<tr><td>Error Sum avg, 60t 2000t ago:</td> <td><span id="error_avg60-2000"></span></td></tr>
+<tr><td>Error Sum avg, 100t 15000t ago:</td> <td><span id="error_avg100-15000"></span></td></tr>
+</table>
+
+<div><button onclick="StartStop();">Pause / Unpause</button></div>
+<div><input type="Checkbox" name="debug" id="cb_debug" onclick="ToggleDebug(event)"> <label for="cb_debug">Toggle debug messages</label> </div>
+<div><button onclick="SerializeNet();">Serialize the network</button></div>
+<div>
+<textarea name="serialization" id="serialization" rows="18" cols="150"></textarea>
+</div>
+<div><button onclick="UnserializeNet();">Unserialize the network</button></div>
+</body></html>
